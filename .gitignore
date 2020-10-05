@@ -1,0 +1,6 @@
+.stack-work/
+*~
+hs-z3.cabal
+*.lock
+Setup.hs
+dist-newstyle/
