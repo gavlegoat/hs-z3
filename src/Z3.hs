@@ -2,12 +2,14 @@ module Z3 (
     BoolExpr(..)
   , CompType(..)
   , ArithExpr(..)
+  , CheckResult(..)
   , mkAssertion
+  , checkAndGetModel
+  , getDoubles
   ) where
 
-import Control.Monad (foldM, liftM2)
 import Control.Monad.State
-import Data.List (foldl')
+import Data.List (foldl', intercalate)
 import Data.Map (Map, (!))
 import qualified Data.Map as M
 
@@ -23,8 +25,30 @@ data ArithExpr d =
   | RealVar d
   | IntConst Int
   | IntVar d
+  deriving (Eq)
+
+instance Show d => Show (ArithExpr d) where
+  show expr = "(" ++ show' expr ++ ")" where
+    show' (Add es) = intercalate " + " $ map show es
+    show' (Mul es) = intercalate " * " $ map show es
+    show' (Sub a b) = show a ++ " - " ++ show b
+    show' (Div a b) = show a ++ " / " ++ show b
+    show' (ToReal a) = "to_real " ++ show a
+    show' (RealConst n d) = show n ++ "/" ++ show d
+    show' (RealVar d) = "real-" ++ show d
+    show' (IntConst n) = show n
+    show' (IntVar d) = "int-" ++ show d
 
 data CompType = Lt | Le | Eq | Ge | Gt | Neq
+  deriving (Eq)
+
+instance Show CompType where
+  show Lt = "<"
+  show Le = "<="
+  show Eq = "=="
+  show Ge = ">="
+  show Gt = ">"
+  show Neq = "/="
 
 data BoolExpr d =
     And [BoolExpr d]
@@ -34,6 +58,23 @@ data BoolExpr d =
   | Comparison CompType (ArithExpr d) (ArithExpr d)
   | BoolConst Bool
   | BoolVar d
+  deriving (Eq)
+
+instance Show d => Show (BoolExpr d) where
+  show expr = "(" ++ show' expr ++ ")" where
+    show' (And es) = intercalate " && " $ map show es
+    show' (Or es) = intercalate " || " $ map show es
+    show' (Not e) = "!" ++ show e
+    show' (Implies a b) = show a ++ " -> " ++ show b
+    show' (Comparison op a b) = show a ++ " " ++ show op ++ " " ++ show b
+    show' (BoolConst b) = show b
+    show' (BoolVar d) = "bool-" ++ show d
+
+data CheckResult d =
+    Unsat
+  | Sat (Map d AST)
+  | Undef
+  deriving (Eq, Show)
 
 arithVariableMap :: (Ord d, Show d) => Context -> ArithExpr d
                  -> StateT (Map d AST) IO ()
@@ -142,3 +183,19 @@ mkAssertion ctx expr = do
   form <- convertBoolFormula ctx vars expr
   return (form, vars)
 
+getModel :: Context -> Model -> Map d AST -> IO (Map d AST)
+getModel ctx m = mapM (fmap snd .  \x -> modelEval ctx m x True)
+
+checkAndGetModel :: (Ord d, Show d) => Context -> Solver -> BoolExpr d
+                 -> IO (CheckResult d)
+checkAndGetModel ctx s expr = do
+  (f, vars) <- mkAssertion ctx expr
+  solverAssert ctx s f
+  res <- solverCheck ctx s
+  case res of
+    L_TRUE -> Sat <$> (solverGetModel ctx s >>= \m -> getModel ctx m vars)
+    L_FALSE -> return Unsat
+    L_UNDEF -> return Undef
+
+getDoubles :: Context -> Map d AST -> IO (Maybe (Map d Double))
+getDoubles ctx mp = Just <$> mapM (getNumeralDouble ctx) mp

@@ -5,6 +5,7 @@ module Z3.LowLevel (
   , Context
   , LBool(..)
   , Solver
+  , Model
   , Tactic
   , AST
   , mkConfig
@@ -43,7 +44,8 @@ module Z3.LowLevel (
   , mkInt
   ) where
 
-import Foreign.Marshal.Array (withArray)
+import Foreign.Marshal (withArray, alloca)
+import Foreign.Storable (peek)
 
 {# context lib = "z3" prefix = "Z3" #}
 
@@ -55,7 +57,7 @@ import Foreign.Marshal.Array (withArray)
 {# pointer symbol as ^ newtype #}
 {# pointer sort as ^ newtype #}
 {# pointer ast as AST #}
-{# pointer model as ^ foreign finalizer model_dec_ref newtype #}
+{# pointer model as ^ foreign finalizer model_dec_ref as modelDecRef newtype #}
 {# enum lbool as LBool {} deriving(Eq) #}
 
 -- Functions for generating Z3 objects
