@@ -4,6 +4,7 @@ module Z3.LowLevel (
     Config
   , Context
   , LBool(..)
+  , SortKind(..)
   , Solver
   , Model
   , Tactic
@@ -18,6 +19,12 @@ module Z3.LowLevel (
   , solverGetModel
   , modelEval
   , getNumeralDouble
+  , getSort
+  , getSortKind
+  , isAlgebraicNumber
+  , getNumeralInt
+  , getNumeralRationalInt64
+  , getBoolValue
   , mkDefaultContext
   , mkSolverFromTactic
   , mkIntVar
@@ -33,7 +40,7 @@ module Z3.LowLevel (
   , mkDiv
   , mkTrue
   , mkFalse
-  , mkBoolVal
+  , mkBool
   , mkLt
   , mkLe
   , mkEq
@@ -42,12 +49,17 @@ module Z3.LowLevel (
   , mkToReal
   , mkReal
   , mkInt
+  , mkDouble
   ) where
 
 import Foreign.Marshal (withArray, alloca)
-import Foreign.Storable (peek)
+import Foreign.Storable (Storable, peek)
+import Foreign.Ptr (Ptr)
 
 {# context lib = "z3" prefix = "Z3" #}
+
+peekInt :: (Storable a, Integral a) => Ptr a -> IO Int
+peekInt = fmap fromIntegral . peek
 
 -- Types
 {# pointer config as ^ foreign finalizer del_config as delConfig newtype #}
@@ -59,6 +71,7 @@ import Foreign.Storable (peek)
 {# pointer ast as AST #}
 {# pointer model as ^ foreign finalizer model_dec_ref as modelDecRef newtype #}
 {# enum lbool as LBool {} deriving(Eq) #}
+{# enum sort_kind as ^ {} deriving(Eq, Show) #}
 
 -- Functions for generating Z3 objects
 {# fun unsafe mk_config as ^ {} -> `Config' #}
@@ -79,6 +92,13 @@ import Foreign.Storable (peek)
 -- Model interface
 {# fun unsafe model_eval as ^ {`Context', `Model', `AST', `Bool', alloca- `AST' peek*} -> `Bool' #}
 {# fun unsafe get_numeral_double as ^ {`Context', `AST'} -> `Double' #}
+{# fun unsafe get_sort as ^ {`Context', `AST'} -> `Sort' #}
+{# fun unsafe get_sort_kind as ^ {`Context', `Sort'} -> `SortKind' #}
+{# fun unsafe get_bool_value as ^ {`Context', `AST'} -> `LBool' #}
+{# fun unsafe get_numeral_int as ^ {`Context', `AST', alloca- `Int' peekInt*} -> `Bool' #}
+{# fun unsafe is_algebraic_number as ^ {`Context', `AST'} -> `Bool' #}
+{# fun unsafe get_numeral_rational_int64 as ^
+  {`Context', `AST', alloca- `Int' peekInt*, alloca- `Int' peekInt*} -> `Bool' #}
 
 -- Building symbols and constants
 {# fun unsafe mk_const as ^ {`Context', `Symbol', `Sort'} -> `AST' #}
@@ -106,6 +126,7 @@ import Foreign.Storable (peek)
 {# fun unsafe mk_gt as ^ {`Context', `AST', `AST'} -> `AST' #}
 {# fun unsafe mk_int2real as mkToReal {`Context', `AST'} -> `AST' #}
 {# fun unsafe mk_real as ^ {`Context', `Int', `Int'} -> `AST' #}
+{# fun unsafe mk_numeral as ^ {`Context', `String', `Sort'} -> `AST' #}
 {# fun unsafe mk_int as mkIntInternal {`Context', `Int', `Sort'} -> `AST' #}
 
 mkDefaultContext :: IO Context
@@ -169,10 +190,15 @@ mkMul ctx es = mkMulInternal ctx (length es) es
 mkSub :: Context -> AST -> AST -> IO AST
 mkSub ctx a b = mkSubInternal ctx 2 [a, b]
 
-mkBoolVal :: Context -> Bool -> IO AST
-mkBoolVal ctx b = if b then mkTrue ctx else mkFalse ctx
+mkBool :: Context -> Bool -> IO AST
+mkBool ctx b = if b then mkTrue ctx else mkFalse ctx
 
 mkInt :: Context -> Int -> IO AST
 mkInt ctx i = do
   is <- mkIntSort ctx
   mkIntInternal ctx i is
+
+mkDouble :: Context -> Double -> IO AST
+mkDouble ctx d = do
+  rs <- mkRealSort ctx
+  mkNumeral ctx (show d) rs
