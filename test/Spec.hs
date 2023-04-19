@@ -12,6 +12,9 @@ main = do
   solverAssert ctx solver ast
   res <- solverCheck ctx solver
   case res of
-    L_TRUE -> print "Satisfiable"
+    L_TRUE -> do
+      print "Satisfiable"
+      m <- solverGetModel ctx solver
+      getModel ctx m vs >>= print
     L_FALSE -> print "Unsatisfiable"
     L_UNDEF -> print "Unknown"

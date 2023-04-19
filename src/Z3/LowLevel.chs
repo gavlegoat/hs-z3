@@ -68,7 +68,7 @@ peekInt = fmap fromIntegral . peek
 {# pointer tactic as ^ foreign finalizer tactic_dec_ref as tacticDecRef newtype #}
 {# pointer symbol as ^ newtype #}
 {# pointer sort as ^ newtype #}
-{# pointer ast as AST #}
+{# pointer ast as AST foreign finalizer dec_ref as decRef #}
 {# pointer model as ^ foreign finalizer model_dec_ref as modelDecRef newtype #}
 {# enum lbool as LBool {} deriving(Eq) #}
 {# enum sort_kind as ^ {} deriving(Eq, Show) #}

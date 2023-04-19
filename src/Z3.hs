@@ -7,6 +7,7 @@ module Z3
   , mkAssertion
   , mkAssertionWithBindings , checkAndGetModel
   , getDoubles
+  , getModel
   ) where
 
 import Control.Monad.State
